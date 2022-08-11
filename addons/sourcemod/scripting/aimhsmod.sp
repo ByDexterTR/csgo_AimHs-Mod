@@ -1,157 +1,195 @@
-// ---- include ---- //
-
 #include <sourcemod>
 #include <sdktools>
-#include <cstrike>
-#include <sdkhooks>
-#include <multicolors>
-
-// ---- Pragma ---- //
 
 #pragma semicolon 1
 #pragma newdecls required
 
-// ---- int ---- //
+int g_WeaponParent = -1;
+bool Mod = false;
+int silah = 1;
+ConVar aimtimer = null;
 
-int g_WeaponParent;
-int Digerel = 6;
-int Endleme;
-
-// ---- ConVar ---- //
-
-ConVar ConVar_AimMod_T;
-
-// ---- Handle ---- //
-
-Handle Handle_AimMod_T;
-
-// ---- myinfo ---- //
-
-public Plugin myinfo =
+public Plugin myinfo = 
 {
-	name = "AimHS Mod oylaması",
-	author = "ByDexter",
-	description = "AimHS modu oylaması yapar",
-	version = "1.0",
+	name = "AimHS Mod oylaması", 
+	author = "ByDexter", 
+	description = "AimHS modu oylaması yapar", 
+	version = "1.1", 
 	url = "https://steamcommunity.com/id/ByDexterTR/"
 }
 
-// -------------------- OnXStart -------------------- //
-
 public void OnPluginStart()
 {
-	// ---------------- Prop ---------------- //
 	g_WeaponParent = FindSendPropInfo("CBaseCombatWeapon", "m_hOwnerEntity");
-	// ---------------- ConVar ---------------- //
-	ConVar_AimMod_T = CreateConVar("sm_aimhs_timer", "45.0", "Kaç saniyede bir oylama yapsın");
-	// ---------------- Hook ---------------- //
-	HookEvent("round_end", Control_REnd);
-	HookEvent("round_start", Control_RStart);
-	// ---------------- Config ---------------- //
+	
+	aimtimer = CreateConVar("sm_aimhs_timer", "5", "Kaç dakika arayla oylama yapılsın", 0, true, 1.0);
+	
+	HookEvent("round_end", OnRoundEnd);
+	HookEvent("round_start", OnRoundStart);
+	
 	AutoExecConfig(true, "aimhsmod", "ByDexter");
 }
 
 public void OnMapStart()
 {
-	Handle_AimMod_T = CreateTimer(ConVar_AimMod_T.FloatValue, EventVoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(aimtimer.IntValue * 60.0, VoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-// -------------------- OnXEnd -------------------- //
-
-public void OnMapEnd()
-{
-	delete Handle_AimMod_T;
-}
-
-// -------------------- VOTE -------------------- //
-
-public Action EventVoteStart(Handle timer, any data)
-{
-	VoteYaptir();
-}
-
-void VoteYaptir()
+public Action VoteStart(Handle timer, any data)
 {
 	if (IsVoteInProgress())
 	{
-		return;
+		CancelVote();
 	}
-	Menu menu = new Menu(Handle_VoteMenu);
-	menu.SetTitle("<-- AimHS Modu? -->");
-	menu.AddItem("no", "--> Hayır <--");
-	menu.AddItem("ak47", "--> Ak47 <--");
-	menu.AddItem("m4a4", "--> M4a4 <--");
-	menu.AddItem("m4a1", "--> M4a1-s <--");
-	menu.AddItem("deagle", "--> Deagle <--");
-	menu.AddItem("usp", "--> Usp-s <--");
+	Menu menu = new Menu(VoteMenu_Callback);
+	menu.SetTitle("AimHS Modu?\n ");
+	menu.AddItem("0", "--> Hayır\n ");
+	menu.AddItem("1", "--> Ak47");
+	menu.AddItem("2", "--> M4a4");
+	menu.AddItem("3", "--> M4a1-s");
+	menu.AddItem("4", "--> Deagle");
+	menu.AddItem("5", "--> Usp-s");
 	menu.ExitButton = false;
 	menu.DisplayVoteToAll(20);
+	return Plugin_Stop;
 }
 
-public int Handle_VoteMenu(Menu menu, MenuAction action, int param1,int param2)
+public int VoteMenu_Callback(Menu menu, MenuAction action, int param1, int param2)
 {
-	if (action == MenuAction_End)
+	switch (action)
 	{
-		if(Digerel == 6)
+		case MenuAction_End:
 		{
-			Handle_AimMod_T = CreateTimer(ConVar_AimMod_T.FloatValue, EventVoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
-			CPrintToChatAll("{darkred}[ByDexter] {green}%d saniye {default}sonra tekrar oylama yapılacak", ConVar_AimMod_T.IntValue);
+			if (!Mod)
+			{
+				CreateTimer(aimtimer.IntValue * 60.0, VoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
+				PrintToChatAll("[SM] \x10AimHS modu\x01 istenmedi, \x06%d dakika\x01 sonra tekrar oylama yapılacak.", aimtimer.IntValue);
+			}
+			delete menu;
 		}
-		delete menu;
-	} 
-	else if (action == MenuAction_VoteEnd) 
-	{
-		if (param1 == 0)
+		case MenuAction_VoteEnd:
 		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}AimHS Modu {default}istenmedi.");
-			Digerel = 6;
-			
-		}
-		if (param1 == 1)
-		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}Diğer el {default}Ak47 HS turu olacak");
-			Digerel = 1;
-		}
-		if (param1 == 2)
-		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}Diğer el {default}M4a4 HS turu olacak");
-			Digerel = 2;
-		}
-		if (param1 == 3)
-		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}Diğer el {default}M4a1-s HS turu olacak");
-			Digerel = 3;
-		}
-		if (param1 == 4)
-		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}Diğer el {default}Deagle HS turu olacak");
-			Digerel = 4;
-		}
-		if (param1 == 5)
-		{
-			CPrintToChatAll("{darkred}[ByDexter] {green}Diğer el {default}Usp-s HS turu olacak");
-			Digerel = 5;
+			Mod = false;
+			silah = param1;
+			switch (param1)
+			{
+				case 1:
+				{
+					PrintToChatAll("[SM] \x10AimHS modu\x01 Ak47 seçildi, diğer tur sadece headshot turu olacak.");
+					Mod = true;
+				}
+				case 2:
+				{
+					PrintToChatAll("[SM] \x10AimHS modu\x01 M4a4 seçildi, diğer tur sadece headshot turu olacak.");
+					Mod = true;
+				}
+				case 3:
+				{
+					PrintToChatAll("[SM] \x10AimHS modu\x01 M4a1-s seçildi, diğer tur sadece headshot turu olacak.");
+					Mod = true;
+				}
+				case 4:
+				{
+					PrintToChatAll("[SM] \x10AimHS modu\x01 Deagle seçildi, diğer tur sadece headshot turu olacak.");
+					Mod = true;
+				}
+				case 5:
+				{
+					PrintToChatAll("[SM] \x10AimHS modu\x01 Usp seçildi, diğer tur sadece headshot turu olacak.");
+					Mod = true;
+				}
+			}
 		}
 	}
+	return 0;
 }
 
-// -------------------- Void -------------------- //
-
-void SilahlariSil(int client)
+public Action OnRoundStart(Event event, const char[] name, bool db)
 {
-	for(int j = 0; j < 5; j++)
+	if (Mod)
 	{
-		int weapon = GetPlayerWeaponSlot(client, j);
-		if(weapon != -1)
+		GroundWeaponClear();
+		for (int i = 1; i <= MaxClients; i++)
 		{
-			RemovePlayerItem(client, weapon);
-			RemoveEdict(weapon);						
+			if (IsClientInGame(i))
+			{
+				ClearWeaponEx(i);
+			}
+		}
+		SetCvar("mp_damage_headshot_only", 1);
+	}
+	return Plugin_Continue;
+}
+
+public Action OnRoundEnd(Event event, const char[] name, bool db)
+{
+	if (Mod)
+	{
+		GroundWeaponClear();
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (IsClientInGame(i))
+			{
+				ClearWeaponEx(i);
+			}
+		}
+		Mod = false;
+		CreateTimer(aimtimer.IntValue * 60.0, VoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
+		PrintToChatAll("[SM] \x10AimHS modu\x01 bitti, \x06%d dakika\x01 sonra tekrar oylama yapılacak.", aimtimer.IntValue);
+	}
+	return Plugin_Continue;
+}
+
+void SetCvar(char[] cvarName, int value)
+{
+	ConVar IntCvar = FindConVar(cvarName);
+	if (IntCvar == null)return;
+	int flags = IntCvar.Flags;
+	flags &= ~FCVAR_NOTIFY;
+	IntCvar.Flags = flags;
+	IntCvar.IntValue = value;
+	flags |= FCVAR_NOTIFY;
+	IntCvar.Flags = flags;
+}
+
+void ClearWeaponEx(int client)
+{
+	int wepIdx;
+	for (int i; i < 13; i++)
+	{
+		while ((wepIdx = GetPlayerWeaponSlot(client, i)) != -1)
+		{
+			RemovePlayerItem(client, wepIdx);
+			RemoveEntity(wepIdx);
 		}
 	}
 	GivePlayerItem(client, "weapon_knife");
+	switch (silah)
+	{
+		case 1:
+		{
+			GivePlayerItem(client, "weapon_ak47");
+		}
+		case 2:
+		{
+			GivePlayerItem(client, "weapon_m4a1");
+		}
+		case 3:
+		{
+			GivePlayerItem(client, "weapon_m4a1_silencer");
+		}
+		case 4:
+		{
+			GivePlayerItem(client, "weapon_deagle");
+		}
+		case 5:
+		{
+			GivePlayerItem(client, "weapon_usp_silencer");
+		}
+	}
 }
 
-void YerdekiSilahlariSil()
+void GroundWeaponClear()
 {
 	int maxent = GetMaxEntities();
 	char weapon[64];
@@ -159,111 +197,9 @@ void YerdekiSilahlariSil()
 	{
 		if (IsValidEdict(i) && IsValidEntity(i))
 		{
-			GetEdictClassname(i, weapon, sizeof(weapon));
+			GetEntityClassname(i, weapon, sizeof(weapon));
 			if ((StrContains(weapon, "weapon_") != -1 || StrContains(weapon, "item_") != -1) && GetEntDataEnt2(i, g_WeaponParent) == -1)
-			RemoveEdict(i);
+				RemoveEntity(i);
 		}
 	}
-}
-
-void SetCvar(char cvarName[64], int value)
-{
-	Handle IntCvar = FindConVar(cvarName);
-	if (IntCvar)
-	{
-		int flags = GetConVarFlags(IntCvar);
-		flags &= ~FCVAR_NOTIFY;
-		SetConVarFlags(IntCvar, flags);
-		SetConVarInt(IntCvar, value, false, false);
-		flags |= FCVAR_NOTIFY;
-		SetConVarFlags(IntCvar, flags);
-	}
-}
-
-// -------------------- HookEvent -------------------- //
-
-public Action Control_RStart(Handle event, const char[] name, bool dontBroadcast)
-{
-	for (int i = 1; i <= MaxClients; i++) 
-	if(IsClientInGame(i) && !IsFakeClient(i))
-	{
-		if(Digerel == 1)
-		{
-			Endleme = 1;
-			YerdekiSilahlariSil();
-			SilahlariSil(i);
-			CPrintToChatAll("{darkred}[ByDexter] {green}Ak47 turu {default}başlıyor");
-			SetCvar("mp_damage_headshot_only", 1);
-			GivePlayerItem(i, "weapon_ak47");
-		}
-		else if(Digerel == 2)
-		{
-			Endleme = 1;
-			YerdekiSilahlariSil();
-			SilahlariSil(i);
-			CPrintToChatAll("{darkred}[ByDexter] {green}M4a4 turu {default}başlıyor");
-			SetCvar("mp_damage_headshot_only", 1);
-			GivePlayerItem(i, "weapon_m4a1");
-		}
-		else if(Digerel == 3)
-		{
-			Endleme = 1;
-			YerdekiSilahlariSil();
-			SilahlariSil(i);
-			CPrintToChatAll("{darkred}[ByDexter] {green}M4a1-s turu {default}başlıyor");
-			SetCvar("mp_damage_headshot_only", 1);
-			GivePlayerItem(i, "weapon_m4a1_silencer");
-		}
-		else if(Digerel == 4)
-		{
-			Endleme = 1;
-			YerdekiSilahlariSil();
-			SilahlariSil(i);
-			CPrintToChatAll("{darkred}[ByDexter] {green}Deagle turu {default}başlıyor");
-			SetCvar("mp_damage_headshot_only", 1);
-			GivePlayerItem(i, "weapon_deagle");
-		}
-		else if(Digerel == 5)
-		{
-			Endleme = 1;
-			YerdekiSilahlariSil();
-			SilahlariSil(i);
-			CPrintToChatAll("{darkred}[ByDexter] {green}Usp-s turu {default}başlıyor");
-			SetCvar("mp_damage_headshot_only", 1);
-			GivePlayerItem(i, "weapon_usp_silencer");
-		}
-	}
-}	
-
-public Action Control_REnd(Handle event, const char[] name, bool dontBroadcast)
-{
-	for (int i = 1; i <= MaxClients; i++) 
-	if(Endleme && IsClientInGame(i) && !IsFakeClient(i))
-	{
-		Endleme = 0;
-		Digerel = 6;
-		SetCvar("mp_damage_headshot_only", 0);
-		Handle_AimMod_T = CreateTimer(ConVar_AimMod_T.FloatValue, EventVoteStart, _, TIMER_FLAG_NO_MAPCHANGE);
-		CPrintToChatAll("{darkred}[ByDexter] {green}%d saniye {default}sonra tekrar oylama yapılacak", ConVar_AimMod_T.IntValue);
-	}
-}
-
-// -------------------- Map Control -------------------- //
-
-public void OnAutoConfigsBuffered()
-{
-    CreateTimer(3.0, aimcontrol);
-}
-
-public Action aimcontrol(Handle timer)
-{
-    char filename[512];
-    GetPluginFilename(INVALID_HANDLE, filename, sizeof(filename));
-    char mapname[PLATFORM_MAX_PATH];
-    GetCurrentMap(mapname, sizeof(mapname));
-    if (StrContains(mapname, "aim_", false) == -1)
-    {
-        ServerCommand("sm plugins unload %s", filename);
-    }
-    return Plugin_Stop;
-}
+} 
